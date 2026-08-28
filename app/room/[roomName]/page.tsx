@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 
 import {
   AudioTrack,
   LiveKitRoom,
   VideoTrack,
+  useConnectionState,
   useLocalParticipant,
   useParticipants,
+  useRoomContext,
   useTracks,
 } from "@livekit/components-react";
 
-import { Track } from "livekit-client";
+import {
+  ConnectionState,
+  Track,
+} from "livekit-client";
 
 type TokenResponse = {
   token: string;
@@ -26,7 +31,9 @@ export default function RoomPage() {
   const roomName = String(params.roomName || "").toUpperCase();
   const participantName = searchParams.get("name") || "Visitante";
 
-  const [tokenData, setTokenData] = useState<TokenResponse | null>(null);
+  const [tokenData, setTokenData] =
+    useState<TokenResponse | null>(null);
+
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -34,6 +41,7 @@ export default function RoomPage() {
     async function connectToRoom() {
       try {
         setLoading(true);
+        setError("");
 
         const response = await fetch("/api/token", {
           method: "POST",
@@ -56,8 +64,6 @@ export default function RoomPage() {
 
         setTokenData(data);
       } catch (err) {
-        console.error(err);
-
         setError(
           err instanceof Error
             ? err.message
@@ -93,7 +99,7 @@ export default function RoomPage() {
     return (
       <main className="min-h-screen bg-[#030706] text-white flex items-center justify-center p-6">
         <div className="max-w-lg rounded-3xl border border-red-400/20 bg-red-400/5 p-8 text-center">
-          <h1 className="text-4xl font-black text-red-400">
+          <h1 className="text-3xl font-black text-red-400">
             Não foi possível conectar
           </h1>
 
@@ -136,8 +142,21 @@ function JamRoom({
   roomName: string;
   participantName: string;
 }) {
-  const participants = useParticipants();
-  const { localParticipant } = useLocalParticipant();
+  const room = useRoomContext();
+
+  const connectionState =
+    useConnectionState(room);
+
+  const isConnected =
+    connectionState === ConnectionState.Connected;
+
+  const participants =
+    useParticipants();
+
+  const {
+    localParticipant,
+    microphoneTrack,
+  } = useLocalParticipant();
 
   const screenTracks = useTracks(
     [Track.Source.ScreenShare],
@@ -160,11 +179,17 @@ function JamRoom({
     }
   );
 
-  const [micOn, setMicOn] = useState(true);
-  const [isSharing, setIsSharing] = useState(false);
+  const [micOn, setMicOn] =
+    useState(false);
 
-  const [shiuuu, setShiuuu] = useState(false);
-  const [configOpen, setConfigOpen] = useState(false);
+  const [isSharing, setIsSharing] =
+    useState(false);
+
+  const [shiuuu, setShiuuu] =
+    useState(false);
+
+  const [configOpen, setConfigOpen] =
+    useState(false);
 
   const [noiseSuppression, setNoiseSuppression] =
     useState(true);
@@ -178,20 +203,45 @@ function JamRoom({
   const [sensitivity, setSensitivity] =
     useState(-45);
 
-  const [message, setMessage] = useState("");
+  const [micLevel, setMicLevel] =
+    useState(-60);
 
-  const activeScreenTrack =
-    screenTracks.length > 0
-      ? screenTracks[0]
-      : undefined;
+  const [isSpeaking, setIsSpeaking] =
+    useState(false);
 
-  const someoneElseSharing =
-    screenTracks.some(
-      (track) =>
-        track.participant.identity !==
-        localParticipant.identity
-    );
+  const [monitoring, setMonitoring] =
+    useState(false);
 
+  const [message, setMessage] =
+    useState("");
+
+  const audioContextRef =
+    useRef<AudioContext | null>(null);
+
+  const analyserRef =
+    useRef<AnalyserNode | null>(null);
+
+  const animationRef =
+    useRef<number | null>(null);
+
+  const monitorTrackRef =
+    useRef<MediaStreamTrack | null>(null);
+
+  /*
+   * Usamos ref para o analyser sempre enxergar
+   * o valor MAIS RECENTE do slider.
+   */
+  const sensitivityRef =
+    useRef(sensitivity);
+
+  useEffect(() => {
+    sensitivityRef.current =
+      sensitivity;
+  }, [sensitivity]);
+
+  /*
+   * Sincroniza interface com LiveKit.
+   */
   useEffect(() => {
     setMicOn(
       localParticipant.isMicrophoneEnabled
@@ -206,11 +256,83 @@ function JamRoom({
     localParticipant.isScreenShareEnabled,
   ]);
 
+  /*
+   * Limpeza quando o componente sair.
+   */
+  useEffect(() => {
+    return () => {
+      stopMicMonitor();
+    };
+  }, []);
+
+  const activeScreenTrack =
+    screenTracks.length > 0
+      ? screenTracks[0]
+      : undefined;
+
+  /*
+   * Existe outra pessoa compartilhando?
+   */
+  const someoneElseSharing =
+    screenTracks.some(
+      (track) =>
+        track.participant.identity !==
+        localParticipant.identity
+    );
+
+  /*
+   * Configurações individuais do mic.
+   */
+  function getMicOptions() {
+    return {
+      noiseSuppression,
+      echoCancellation,
+      autoGainControl,
+
+      /*
+       * Pedimos baixa latência.
+       */
+      latency: 0,
+
+      /*
+       * Voz = mono.
+       */
+      channelCount: 1,
+    };
+  }
+
+  /*
+   * Proteção central contra o erro:
+   * "engine not connected".
+   */
+  function canPublishMedia() {
+    if (!isConnected) {
+      setMessage(
+        connectionState === ConnectionState.Reconnecting
+          ? "Reconectando ao servidor. Aguarde alguns segundos..."
+          : "Conectando ao servidor. Aguarde alguns segundos..."
+      );
+
+      return false;
+    }
+
+    return true;
+  }
+
+  /*
+   * MICROFONE
+   */
   async function toggleMicrophone() {
+    if (!canPublishMedia()) {
+      return;
+    }
+
     try {
-      if (
-        localParticipant.isMicrophoneEnabled
-      ) {
+      setMessage("");
+
+      if (localParticipant.isMicrophoneEnabled) {
+        stopMicMonitor();
+
         await localParticipant.setMicrophoneEnabled(
           false
         );
@@ -219,46 +341,65 @@ function JamRoom({
       } else {
         await localParticipant.setMicrophoneEnabled(
           true,
-          {
-            noiseSuppression,
-            echoCancellation,
-            autoGainControl,
-            latency: 0,
-            channelCount: 1,
-          }
+          getMicOptions()
         );
 
         setMicOn(true);
       }
     } catch (error) {
-      console.error(error);
+      const text =
+        error instanceof Error
+          ? error.message
+          : "";
 
-      setMessage(
-        "Não foi possível acessar o microfone."
-      );
+      if (
+        text.includes("not connected") ||
+        text.includes("timeout")
+      ) {
+        setMessage(
+          "A conexão ainda não estava pronta. Aguarde 2 segundos e tente novamente."
+        );
+      } else {
+        setMessage(
+          "Não foi possível ativar o microfone. Confira a permissão do navegador."
+        );
+      }
     }
   }
 
+  /*
+   * APLICAR CONFIGURAÇÕES
+   */
   async function applyMicrophoneSettings() {
+    if (!canPublishMedia()) {
+      return;
+    }
+
     try {
+      stopMicMonitor();
+
       const wasEnabled =
         localParticipant.isMicrophoneEnabled;
 
       if (wasEnabled) {
+        /*
+         * Recriamos a track para aplicar
+         * as novas MediaTrackConstraints.
+         */
         await localParticipant.setMicrophoneEnabled(
           false
         );
 
+        await new Promise((resolve) =>
+          setTimeout(resolve, 150)
+        );
+
         await localParticipant.setMicrophoneEnabled(
           true,
-          {
-            noiseSuppression,
-            echoCancellation,
-            autoGainControl,
-            latency: 0,
-            channelCount: 1,
-          }
+          getMicOptions()
         );
+
+        setMicOn(true);
       }
 
       setConfigOpen(false);
@@ -267,19 +408,24 @@ function JamRoom({
         "Configurações do microfone aplicadas."
       );
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setMessage("");
       }, 2500);
-    } catch (error) {
-      console.error(error);
-
+    } catch {
       setMessage(
-        "Não foi possível aplicar as configurações."
+        "Não foi possível aplicar as configurações do microfone."
       );
     }
   }
 
+  /*
+   * COMPARTILHAMENTO DE TELA
+   */
   async function startScreenShare() {
+    if (!canPublishMedia()) {
+      return;
+    }
+
     try {
       setMessage("");
 
@@ -312,11 +458,23 @@ function JamRoom({
 
       setIsSharing(true);
     } catch (error) {
-      console.error(error);
+      const text =
+        error instanceof Error
+          ? error.message
+          : "";
 
-      setMessage(
-        "Compartilhamento cancelado ou não permitido."
-      );
+      if (
+        text.includes("not connected") ||
+        text.includes("timeout")
+      ) {
+        setMessage(
+          "A conexão ainda não estava pronta para transmitir. Tente novamente."
+        );
+      } else {
+        setMessage(
+          "Compartilhamento cancelado ou não permitido pelo navegador."
+        );
+      }
     }
   }
 
@@ -327,11 +485,16 @@ function JamRoom({
       );
 
       setIsSharing(false);
-    } catch (error) {
-      console.error(error);
+    } catch {
+      setMessage(
+        "Não foi possível interromper o compartilhamento."
+      );
     }
   }
 
+  /*
+   * CONVITE
+   */
   async function copyInvite() {
     try {
       const inviteUrl =
@@ -345,7 +508,7 @@ function JamRoom({
         "Link copiado! Envie para seus amigos."
       );
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setMessage("");
       }, 3000);
     } catch {
@@ -355,6 +518,277 @@ function JamRoom({
     }
   }
 
+  /*
+   * TESTE / MEDIDOR DO MICROFONE
+   */
+  async function startMicMonitor() {
+    if (!canPublishMedia()) {
+      return;
+    }
+
+    try {
+      setMessage("");
+
+      /*
+       * Para eventual monitor anterior.
+       */
+      stopMicMonitor();
+
+      /*
+       * Primeiro tentamos usar a track atual.
+       */
+      let publication =
+        microphoneTrack;
+
+      /*
+       * Se o mic estiver desligado,
+       * nós o ligamos primeiro.
+       */
+      if (
+        !localParticipant.isMicrophoneEnabled ||
+        !publication?.track
+      ) {
+        const createdPublication =
+          await localParticipant.setMicrophoneEnabled(
+            true,
+            getMicOptions()
+          );
+
+        setMicOn(true);
+
+        /*
+         * Se o LiveKit devolveu a publicação,
+         * usamos imediatamente.
+         */
+        if (createdPublication) {
+          publication =
+            createdPublication;
+        }
+      }
+
+      /*
+       * Dá tempo para o estado React/LiveKit
+       * receber a publicação caso necessário.
+       */
+      if (!publication?.track) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 300)
+        );
+
+        publication =
+          localParticipant.getTrackPublication(
+            Track.Source.Microphone
+          );
+      }
+
+      const livekitTrack =
+        publication?.track;
+
+      if (!livekitTrack) {
+        setMessage(
+          "O microfone foi ativado, mas a track ainda não ficou disponível. Clique em TESTAR novamente."
+        );
+
+        return;
+      }
+
+      const originalMediaTrack =
+        livekitTrack.mediaStreamTrack;
+
+      if (!originalMediaTrack) {
+        setMessage(
+          "Não foi possível acessar o sinal do microfone."
+        );
+
+        return;
+      }
+
+      /*
+       * IMPORTANTE:
+       *
+       * Clonamos a track para o medidor.
+       * Assim o analyser NÃO interfere na
+       * track que está sendo enviada ao LiveKit.
+       */
+      const monitorTrack =
+        originalMediaTrack.clone();
+
+      monitorTrackRef.current =
+        monitorTrack;
+
+      const audioContext =
+        new AudioContext();
+
+      audioContextRef.current =
+        audioContext;
+
+      if (
+        audioContext.state === "suspended"
+      ) {
+        await audioContext.resume();
+      }
+
+      const stream =
+        new MediaStream([
+          monitorTrack,
+        ]);
+
+      const source =
+        audioContext.createMediaStreamSource(
+          stream
+        );
+
+      const analyser =
+        audioContext.createAnalyser();
+
+      analyser.fftSize = 2048;
+
+      /*
+       * Menor valor = resposta mais rápida.
+       */
+      analyser.smoothingTimeConstant =
+        0.45;
+
+      source.connect(analyser);
+
+      analyserRef.current =
+        analyser;
+
+      const samples =
+        new Float32Array(
+          analyser.fftSize
+        );
+
+      setMonitoring(true);
+
+      function readLevel() {
+        analyser.getFloatTimeDomainData(
+          samples
+        );
+
+        let sum = 0;
+
+        for (
+          let i = 0;
+          i < samples.length;
+          i++
+        ) {
+          sum +=
+            samples[i] *
+            samples[i];
+        }
+
+        const rms =
+          Math.sqrt(
+            sum /
+              samples.length
+          );
+
+        let db =
+          rms > 0
+            ? 20 *
+              Math.log10(rms)
+            : -60;
+
+        /*
+         * Limitamos visualmente entre
+         * -60 e 0 dB.
+         */
+        db = Math.max(
+          -60,
+          Math.min(0, db)
+        );
+
+        setMicLevel(
+          Math.round(db)
+        );
+
+        /*
+         * AGORA usa o valor atual do slider,
+         * mesmo que ele seja alterado enquanto
+         * o medidor estiver funcionando.
+         */
+        setIsSpeaking(
+          db >=
+            sensitivityRef.current
+        );
+
+        animationRef.current =
+          requestAnimationFrame(
+            readLevel
+          );
+      }
+
+      readLevel();
+    } catch (error) {
+      const text =
+        error instanceof Error
+          ? error.message
+          : "";
+
+      if (
+        text.includes("not connected") ||
+        text.includes("timeout")
+      ) {
+        setMessage(
+          "A conexão com o servidor ainda não estava pronta. Aguarde alguns segundos e teste novamente."
+        );
+      } else {
+        setMessage(
+          "Não foi possível iniciar o teste. Confira se o Chrome tem permissão para usar o microfone."
+        );
+      }
+    }
+  }
+
+  function stopMicMonitor() {
+    if (
+      animationRef.current !== null
+    ) {
+      cancelAnimationFrame(
+        animationRef.current
+      );
+
+      animationRef.current = null;
+    }
+
+    /*
+     * Paramos SOMENTE a cópia usada
+     * pelo analisador.
+     */
+    if (monitorTrackRef.current) {
+      monitorTrackRef.current.stop();
+
+      monitorTrackRef.current =
+        null;
+    }
+
+    if (audioContextRef.current) {
+      const context =
+        audioContextRef.current;
+
+      audioContextRef.current =
+        null;
+
+      if (
+        context.state !== "closed"
+      ) {
+        context
+          .close()
+          .catch(() => {});
+      }
+    }
+
+    analyserRef.current = null;
+
+    setMonitoring(false);
+    setMicLevel(-60);
+    setIsSpeaking(false);
+  }
+
+  /*
+   * ÁUDIO REMOTO
+   */
   const remoteMicrophones =
     microphoneTracks.filter(
       (track) =>
@@ -369,40 +803,72 @@ function JamRoom({
         localParticipant.identity
     );
 
+  /*
+   * Conversão dB → porcentagem.
+   */
+  const meterWidth =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        ((micLevel + 60) / 60) *
+          100
+      )
+    );
+
+  const thresholdPosition =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        ((sensitivity + 60) /
+          60) *
+          100
+      )
+    );
+
   return (
     <main className="min-h-screen bg-[#030706] text-white p-4 md:p-8">
 
-      {/* ÁUDIO REMOTO */}
+      {/* ÁUDIOS RECEBIDOS */}
 
       <div className="hidden">
-        {remoteScreenAudio.map((track) => (
-          <AudioTrack
-            key={
-              track.participant.identity +
-              "-screen-audio"
-            }
-            trackRef={track}
-            volume={1}
-            muted={false}
-          />
-        ))}
 
-        {remoteMicrophones.map((track) => (
-          <AudioTrack
-            key={
-              track.participant.identity +
-              "-mic"
-            }
-            trackRef={track}
-            volume={1}
-            muted={shiuuu}
-          />
-        ))}
+        {remoteScreenAudio.map(
+          (track) => (
+            <AudioTrack
+              key={
+                track.participant
+                  .identity +
+                "-screen-audio"
+              }
+              trackRef={track}
+              volume={1}
+              muted={false}
+            />
+          )
+        )}
+
+        {remoteMicrophones.map(
+          (track) => (
+            <AudioTrack
+              key={
+                track.participant
+                  .identity +
+                "-microphone"
+              }
+              trackRef={track}
+              volume={1}
+              muted={shiuuu}
+            />
+          )
+        )}
+
       </div>
 
-      <div className="mx-auto max-w-7xl overflow-hidden rounded-[30px] border border-white/10 bg-[#07100f] shadow-2xl">
+      {/* JANELA PRINCIPAL */}
 
-        {/* BARRA SUPERIOR */}
+      <div className="mx-auto max-w-7xl overflow-hidden rounded-[30px] border border-white/10 bg-[#07100f] shadow-2xl">
 
         <div className="flex items-center gap-2 border-b border-white/10 px-6 py-4">
           <span className="h-3 w-3 rounded-full bg-red-500" />
@@ -425,13 +891,12 @@ function JamRoom({
                 <div className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-emerald-400">
 
                   <div className="flex h-5 items-end gap-[3px]">
-
                     <span className="h-2 w-[3px] rounded-full bg-lime-400" />
                     <span className="h-4 w-[3px] rounded-full bg-emerald-400" />
                     <span className="h-5 w-[3px] rounded-full bg-cyan-400" />
                     <span className="h-3 w-[3px] rounded-full bg-emerald-400" />
-
                   </div>
+
                 </div>
 
                 <span className="bg-gradient-to-r from-lime-400 to-cyan-400 bg-clip-text text-4xl font-black text-transparent">
@@ -442,8 +907,21 @@ function JamRoom({
 
               <div className="flex items-center gap-4">
 
-                <div className="text-green-400">
-                  ● LIVE
+                <div
+                  className={
+                    isConnected
+                      ? "text-green-400"
+                      : "text-yellow-300"
+                  }
+                >
+                  ●{" "}
+                  {connectionState ===
+                  ConnectionState.Connected
+                    ? "LIVE"
+                    : connectionState ===
+                      ConnectionState.Reconnecting
+                    ? "RECONECTANDO"
+                    : "CONECTANDO"}
                 </div>
 
                 <div className="h-6 w-px bg-white/10" />
@@ -467,7 +945,7 @@ function JamRoom({
 
             </header>
 
-            {/* MENSAGEM */}
+            {/* AVISO */}
 
             {message && (
               <div className="mx-auto mb-5 max-w-5xl rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-center text-sm text-cyan-300">
@@ -475,7 +953,7 @@ function JamRoom({
               </div>
             )}
 
-            {/* TRANSMISSÃO */}
+            {/* TELA */}
 
             <section className="mx-auto max-w-5xl rounded-[26px] border border-white/10 bg-black/20 p-4 md:p-6">
 
@@ -496,12 +974,12 @@ function JamRoom({
                   <p className="mt-5 text-center text-white/50">
 
                     <span className="font-semibold text-lime-400">
-                      {
-                        activeScreenTrack.participant
-                          .name ||
-                        activeScreenTrack.participant
-                          .identity
-                      }
+                      {activeScreenTrack
+                        .participant
+                        .name ||
+                        activeScreenTrack
+                          .participant
+                          .identity}
                     </span>
 
                     {" "}está compartilhando
@@ -513,11 +991,9 @@ function JamRoom({
                 <div className="flex min-h-[420px] flex-col items-center justify-center text-center">
 
                   <div className="mb-7 flex h-32 w-48 items-center justify-center rounded-2xl border-2 border-emerald-400/50 bg-emerald-400/5">
-
                     <span className="text-6xl text-emerald-400">
                       ↑
                     </span>
-
                   </div>
 
                   <h2 className="text-2xl font-semibold">
@@ -529,15 +1005,23 @@ function JamRoom({
                   </p>
 
                   <button
-                    onClick={startScreenShare}
-                    disabled={someoneElseSharing}
+                    onClick={
+                      startScreenShare
+                    }
+                    disabled={
+                      someoneElseSharing ||
+                      !isConnected
+                    }
                     className={`mt-8 w-full max-w-md rounded-2xl px-8 py-5 text-lg font-black transition ${
-                      someoneElseSharing
+                      someoneElseSharing ||
+                      !isConnected
                         ? "cursor-not-allowed border border-white/5 bg-white/[0.03] text-white/20"
                         : "bg-gradient-to-r from-lime-400 to-emerald-400 text-black"
                     }`}
                   >
-                    {someoneElseSharing
+                    {!isConnected
+                      ? "CONECTANDO..."
+                      : someoneElseSharing
                       ? "▣ TELA EM USO"
                       : "▣ COMPARTILHAR TELA"}
                   </button>
@@ -570,7 +1054,6 @@ function JamRoom({
 
                 {participants.map(
                   (participant) => {
-
                     const isLocal =
                       participant.identity ===
                       localParticipant.identity;
@@ -592,10 +1075,8 @@ function JamRoom({
                           <div>
 
                             <p>
-                              {
-                                participant.name ||
-                                participant.identity
-                              }
+                              {participant.name ||
+                                participant.identity}
                             </p>
 
                             <p className="text-xs text-white/30">
@@ -635,25 +1116,38 @@ function JamRoom({
             <div className="mx-auto mt-6 grid max-w-5xl grid-cols-2 gap-3 md:grid-cols-5">
 
               <button
-                onClick={toggleMicrophone}
+                onClick={
+                  toggleMicrophone
+                }
+                disabled={!isConnected}
                 className={`rounded-2xl border px-5 py-4 font-semibold transition ${
-                  micOn
+                  !isConnected
+                    ? "cursor-not-allowed border-white/5 text-white/20"
+                    : micOn
                     ? "border-green-400/30 text-green-400 hover:bg-green-400/5"
                     : "border-red-400/30 text-red-400 hover:bg-red-400/5"
                 }`}
               >
-                {micOn
+                {!isConnected
+                  ? "CONECTANDO"
+                  : micOn
                   ? "🎤 MUTE"
-                  : "🔇 ATIVAR MIC"}
+                  : "🎤 ATIVAR MIC"}
               </button>
 
               {!isSharing ? (
                 <button
-                  onClick={startScreenShare}
-                  disabled={someoneElseSharing}
+                  onClick={
+                    startScreenShare
+                  }
+                  disabled={
+                    someoneElseSharing ||
+                    !isConnected
+                  }
                   className={`rounded-2xl border px-5 py-4 font-semibold transition ${
-                    someoneElseSharing
-                      ? "cursor-not-allowed border-white/5 bg-white/[0.02] text-white/20"
+                    someoneElseSharing ||
+                    !isConnected
+                      ? "cursor-not-allowed border-white/5 text-white/20"
                       : "border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/5"
                   }`}
                 >
@@ -663,8 +1157,10 @@ function JamRoom({
                 </button>
               ) : (
                 <button
-                  onClick={stopScreenShare}
-                  className="rounded-2xl border border-red-400/30 px-5 py-4 font-semibold text-red-400 transition hover:bg-red-400/5"
+                  onClick={
+                    stopScreenShare
+                  }
+                  className="rounded-2xl border border-red-400/30 px-5 py-4 font-semibold text-red-400"
                 >
                   ■ PARAR TELA
                 </button>
@@ -674,10 +1170,10 @@ function JamRoom({
                 onClick={() =>
                   setShiuuu(!shiuuu)
                 }
-                className={`rounded-2xl border px-5 py-4 font-semibold transition ${
+                className={`rounded-2xl border px-5 py-4 font-semibold ${
                   shiuuu
                     ? "border-yellow-300 bg-yellow-300/10 text-yellow-300"
-                    : "border-white/10 text-white/60 hover:bg-white/5"
+                    : "border-white/10 text-white/60"
                 }`}
               >
                 🤫{" "}
@@ -688,7 +1184,7 @@ function JamRoom({
 
               <button
                 onClick={copyInvite}
-                className="rounded-2xl border border-cyan-400/30 px-5 py-4 font-semibold text-cyan-400 transition hover:bg-cyan-400/5"
+                className="rounded-2xl border border-cyan-400/30 px-5 py-4 font-semibold text-cyan-400"
               >
                 🔗 CONVIDAR
               </button>
@@ -697,32 +1193,27 @@ function JamRoom({
                 onClick={() =>
                   setConfigOpen(true)
                 }
-                className="rounded-2xl border border-white/10 px-5 py-4 font-semibold text-white/60 transition hover:bg-white/5"
+                className="rounded-2xl border border-white/10 px-5 py-4 font-semibold text-white/60"
               >
                 ⚙ CONFIG
               </button>
 
             </div>
 
-            <p className="mt-6 text-center text-xs text-white/20">
-              Conectado como {participantName}
-            </p>
-
           </div>
         </div>
       </div>
 
-      {/* MODAL CONFIG */}
+      {/* CONFIGURAÇÕES */}
 
       {configOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5">
 
-          <div className="w-full max-w-xl rounded-[28px] border border-emerald-400/30 bg-[#07100f] p-7 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-[28px] border border-emerald-400/30 bg-[#07100f] p-7">
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
 
               <div>
-
                 <h2 className="text-2xl font-bold">
                   Configurações do microfone
                 </h2>
@@ -730,13 +1221,13 @@ function JamRoom({
                 <p className="mt-1 text-sm text-white/40">
                   Essas configurações valem somente para você.
                 </p>
-
               </div>
 
               <button
-                onClick={() =>
-                  setConfigOpen(false)
-                }
+                onClick={() => {
+                  stopMicMonitor();
+                  setConfigOpen(false);
+                }}
                 className="text-2xl text-white/40"
               >
                 ×
@@ -749,7 +1240,9 @@ function JamRoom({
               <SettingToggle
                 label="Supressão de ruído"
                 description="Reduz ruído ambiente do microfone."
-                value={noiseSuppression}
+                value={
+                  noiseSuppression
+                }
                 onChange={
                   setNoiseSuppression
                 }
@@ -758,7 +1251,9 @@ function JamRoom({
               <SettingToggle
                 label="Cancelamento de eco"
                 description="Útil se estiver usando caixas de som."
-                value={echoCancellation}
+                value={
+                  echoCancellation
+                }
                 onChange={
                   setEchoCancellation
                 }
@@ -766,30 +1261,32 @@ function JamRoom({
 
               <SettingToggle
                 label="Ganho automático"
-                description="Ajusta automaticamente o volume da sua voz."
-                value={autoGainControl}
+                description="Ajusta automaticamente o volume da voz."
+                value={
+                  autoGainControl
+                }
                 onChange={
                   setAutoGainControl
                 }
               />
+
+              {/* SENSIBILIDADE */}
 
               <div>
 
                 <div className="flex justify-between gap-4">
 
                   <div>
-
                     <p className="font-medium">
                       Sensibilidade da voz
                     </p>
 
                     <p className="text-sm text-white/40">
-                      Threshold para detectar quando você está falando.
+                      Ajuste o nível mínimo para detectar sua voz.
                     </p>
-
                   </div>
 
-                  <span className="text-cyan-400">
+                  <span className="whitespace-nowrap text-cyan-400">
                     {sensitivity} dB
                   </span>
 
@@ -800,18 +1297,131 @@ function JamRoom({
                   min="-60"
                   max="-25"
                   step="1"
-                  value={sensitivity}
+                  value={
+                    sensitivity
+                  }
                   onChange={(e) =>
                     setSensitivity(
-                      Number(e.target.value)
+                      Number(
+                        e.target.value
+                      )
                     )
                   }
                   className="mt-5 w-full"
                 />
 
                 <div className="mt-2 flex justify-between text-xs text-white/30">
-                  <span>Mais sensível</span>
-                  <span>Menos sensível</span>
+                  <span>
+                    Mais sensível
+                  </span>
+                  <span>
+                    Menos sensível
+                  </span>
+                </div>
+
+              </div>
+
+              {/* MEDIDOR */}
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
+
+                <div className="flex flex-wrap items-start justify-between gap-3">
+
+                  <div>
+                    <p className="font-medium">
+                      Teste do microfone
+                    </p>
+
+                    <p className="mt-1 text-sm text-white/40">
+                      Fale normalmente para ajustar.
+                    </p>
+                  </div>
+
+                  <span
+                    className={`text-sm font-semibold ${
+                      isSpeaking
+                        ? "text-lime-400"
+                        : "text-white/30"
+                    }`}
+                  >
+                    {isSpeaking
+                      ? "VOZ DETECTADA"
+                      : monitoring
+                      ? "SILÊNCIO"
+                      : "PARADO"}
+                  </span>
+
+                </div>
+
+                <div className="relative mt-5 h-4 overflow-hidden rounded-full bg-white/10">
+
+                  <div
+                    className={`h-full transition-all ${
+                      isSpeaking
+                        ? "bg-gradient-to-r from-lime-400 to-emerald-400"
+                        : "bg-white/20"
+                    }`}
+                    style={{
+                      width:
+                        `${meterWidth}%`,
+                    }}
+                  />
+
+                  <div
+                    className="absolute top-0 h-full w-[2px] bg-cyan-300"
+                    style={{
+                      left:
+                        `${thresholdPosition}%`,
+                    }}
+                  />
+
+                </div>
+
+                <div className="mt-2 flex justify-between text-xs text-white/30">
+
+                  <span>
+                    -60 dB
+                  </span>
+
+                  <span
+                    className={
+                      isSpeaking
+                        ? "text-lime-400"
+                        : "text-white/50"
+                    }
+                  >
+                    {micLevel} dB
+                  </span>
+
+                  <span>
+                    0 dB
+                  </span>
+
+                </div>
+
+                <div className="mt-4 flex gap-3">
+
+                  <button
+                    onClick={
+                      startMicMonitor
+                    }
+                    disabled={
+                      !isConnected
+                    }
+                    className="flex-1 rounded-xl border border-emerald-400/30 px-4 py-3 text-sm font-semibold text-emerald-400 disabled:opacity-30"
+                  >
+                    🎤 TESTAR MICROFONE
+                  </button>
+
+                  <button
+                    onClick={
+                      stopMicMonitor
+                    }
+                    className="rounded-xl border border-white/10 px-4 py-3 text-sm text-white/50"
+                  >
+                    PARAR
+                  </button>
+
                 </div>
 
               </div>
@@ -821,9 +1431,10 @@ function JamRoom({
             <div className="mt-8 flex gap-3">
 
               <button
-                onClick={() =>
-                  setConfigOpen(false)
-                }
+                onClick={() => {
+                  stopMicMonitor();
+                  setConfigOpen(false);
+                }}
                 className="flex-1 rounded-xl border border-white/10 px-5 py-4 text-white/50"
               >
                 CANCELAR
@@ -833,7 +1444,10 @@ function JamRoom({
                 onClick={
                   applyMicrophoneSettings
                 }
-                className="flex-1 rounded-xl bg-gradient-to-r from-lime-400 to-emerald-400 px-5 py-4 font-bold text-black"
+                disabled={
+                  !isConnected
+                }
+                className="flex-1 rounded-xl bg-gradient-to-r from-lime-400 to-emerald-400 px-5 py-4 font-bold text-black disabled:opacity-30"
               >
                 SALVAR
               </button>
@@ -864,7 +1478,6 @@ function SettingToggle({
     <div className="flex items-center justify-between gap-4">
 
       <div>
-
         <p className="font-medium">
           {label}
         </p>
@@ -872,14 +1485,14 @@ function SettingToggle({
         <p className="mt-1 text-sm text-white/40">
           {description}
         </p>
-
       </div>
 
       <button
+        type="button"
         onClick={() =>
           onChange(!value)
         }
-        className={`relative h-7 w-14 rounded-full transition ${
+        className={`relative h-7 w-14 shrink-0 rounded-full transition ${
           value
             ? "bg-emerald-400"
             : "bg-white/10"
@@ -887,7 +1500,7 @@ function SettingToggle({
       >
 
         <span
-          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition ${
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
             value
               ? "left-8"
               : "left-1"
