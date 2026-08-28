@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import {
+  useParams,
+  useRouter,
+  useSearchParams,
+} from "next/navigation";
 
 import {
   AudioTrack,
@@ -24,6 +28,8 @@ type TokenResponse = {
   serverUrl: string;
 };
 
+const AUDIO_PREFS_KEY = "jam-audio-preferences";
+
 export default function RoomPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -38,11 +44,8 @@ export default function RoomPage() {
   const [tokenData, setTokenData] =
     useState<TokenResponse | null>(null);
 
-  const [error, setError] =
-    useState("");
-
-  const [loading, setLoading] =
-    useState(true);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function connectToRoom() {
@@ -50,23 +53,18 @@ export default function RoomPage() {
         setLoading(true);
         setError("");
 
-        const response = await fetch(
-          "/api/token",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              roomName,
-              participantName,
-            }),
-          }
-        );
+        const response = await fetch("/api/token", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            roomName,
+            participantName,
+          }),
+        });
 
-        const data =
-          await response.json();
+        const data = await response.json();
 
         if (!response.ok) {
           throw new Error(
@@ -90,22 +88,18 @@ export default function RoomPage() {
     if (roomName) {
       connectToRoom();
     }
-  }, [
-    roomName,
-    participantName,
-  ]);
+  }, [roomName, participantName]);
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-[#030706] text-white flex items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-[#030706] text-white">
         <div className="text-center">
           <h1 className="text-5xl font-black text-lime-400">
             JAM
           </h1>
 
           <p className="mt-5 text-white/50">
-            Conectando à sala{" "}
-            {roomName}...
+            Conectando à sala {roomName}...
           </p>
         </div>
       </main>
@@ -114,23 +108,24 @@ export default function RoomPage() {
 
   if (error || !tokenData) {
     return (
-      <main className="min-h-screen bg-[#030706] text-white flex items-center justify-center p-6">
+      <main className="flex min-h-screen items-center justify-center bg-[#030706] p-6 text-white">
         <div className="max-w-lg rounded-3xl border border-red-400/20 bg-red-400/5 p-8 text-center">
+
           <h1 className="text-3xl font-black text-red-400">
             Não foi possível conectar
           </h1>
 
           <p className="mt-4 text-white/60">
-            {error ||
-              "Token indisponível."}
+            {error || "Token indisponível."}
           </p>
 
           <a
             href="/"
             className="mt-8 inline-block rounded-xl border border-white/20 px-6 py-3"
           >
-            Voltar
+            Voltar ao menu
           </a>
+
         </div>
       </main>
     );
@@ -139,9 +134,7 @@ export default function RoomPage() {
   return (
     <LiveKitRoom
       token={tokenData.token}
-      serverUrl={
-        tokenData.serverUrl
-      }
+      serverUrl={tokenData.serverUrl}
       connect={true}
       audio={false}
       video={false}
@@ -149,9 +142,7 @@ export default function RoomPage() {
     >
       <JamRoom
         roomName={roomName}
-        participantName={
-          participantName
-        }
+        participantName={participantName}
       />
     </LiveKitRoom>
   );
@@ -164,8 +155,9 @@ function JamRoom({
   roomName: string;
   participantName: string;
 }) {
-  const room =
-    useRoomContext();
+  const router = useRouter();
+
+  const room = useRoomContext();
 
   const connectionState =
     useConnectionState(room);
@@ -179,7 +171,6 @@ function JamRoom({
 
   const {
     localParticipant,
-    microphoneTrack,
   } = useLocalParticipant();
 
   const screenTracks = useTracks(
@@ -189,27 +180,22 @@ function JamRoom({
     }
   );
 
-  const microphoneTracks =
-    useTracks(
-      [Track.Source.Microphone],
-      {
-        onlySubscribed: true,
-      }
-    );
+  const microphoneTracks = useTracks(
+    [Track.Source.Microphone],
+    {
+      onlySubscribed: true,
+    }
+  );
 
-  const screenAudioTracks =
-    useTracks(
-      [
-        Track.Source
-          .ScreenShareAudio,
-      ],
-      {
-        onlySubscribed: true,
-      }
-    );
+  const screenAudioTracks = useTracks(
+    [Track.Source.ScreenShareAudio],
+    {
+      onlySubscribed: true,
+    }
+  );
 
   /*
-   * ESTADOS PRINCIPAIS
+   * ESTADOS
    */
 
   const [micOn, setMicOn] =
@@ -220,8 +206,10 @@ function JamRoom({
     setIsSharing,
   ] = useState(false);
 
-  const [shiuuu, setShiuuu] =
-    useState(false);
+  const [
+    shiuuu,
+    setShiuuu,
+  ] = useState(false);
 
   const [
     configOpen,
@@ -229,7 +217,7 @@ function JamRoom({
   ] = useState(false);
 
   /*
-   * CONFIGURAÇÕES DO MICROFONE
+   * CONFIGURAÇÕES DE ÁUDIO
    */
 
   const [
@@ -285,16 +273,16 @@ function JamRoom({
     setMonitoring,
   ] = useState(false);
 
+  const [
+    preferencesLoaded,
+    setPreferencesLoaded,
+  ] = useState(false);
+
   const [message, setMessage] =
     useState("");
 
   const audioContextRef =
     useRef<AudioContext | null>(
-      null
-    );
-
-  const analyserRef =
-    useRef<AnalyserNode | null>(
       null
     );
 
@@ -312,8 +300,133 @@ function JamRoom({
     useRef(sensitivity);
 
   /*
-   * Mantém threshold atualizado
-   * durante o teste do mic.
+   * CARREGAR PREFERÊNCIAS
+   */
+
+  useEffect(() => {
+    try {
+      const saved =
+        window.localStorage.getItem(
+          AUDIO_PREFS_KEY
+        );
+
+      if (saved) {
+        const prefs =
+          JSON.parse(saved);
+
+        if (
+          typeof prefs.noiseSuppression ===
+          "boolean"
+        ) {
+          setNoiseSuppression(
+            prefs.noiseSuppression
+          );
+        }
+
+        if (
+          typeof prefs.echoCancellation ===
+          "boolean"
+        ) {
+          setEchoCancellation(
+            prefs.echoCancellation
+          );
+        }
+
+        if (
+          typeof prefs.autoGainControl ===
+          "boolean"
+        ) {
+          setAutoGainControl(
+            prefs.autoGainControl
+          );
+        }
+
+        if (
+          typeof prefs.sensitivity ===
+          "number"
+        ) {
+          setSensitivity(
+            Math.max(
+              -60,
+              Math.min(
+                -25,
+                prefs.sensitivity
+              )
+            )
+          );
+        }
+
+        if (
+          typeof prefs.pushToTalk ===
+          "boolean"
+        ) {
+          setPushToTalk(
+            prefs.pushToTalk
+          );
+        }
+
+        if (
+          typeof prefs.shiuuu ===
+          "boolean"
+        ) {
+          setShiuuu(
+            prefs.shiuuu
+          );
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Erro ao carregar preferências:",
+        error
+      );
+    } finally {
+      setPreferencesLoaded(true);
+    }
+  }, []);
+
+  /*
+   * SALVAR PREFERÊNCIAS
+   */
+
+  useEffect(() => {
+    if (!preferencesLoaded) {
+      return;
+    }
+
+    const preferences = {
+      noiseSuppression,
+      echoCancellation,
+      autoGainControl,
+      sensitivity,
+      pushToTalk,
+      shiuuu,
+    };
+
+    try {
+      window.localStorage.setItem(
+        AUDIO_PREFS_KEY,
+        JSON.stringify(
+          preferences
+        )
+      );
+    } catch (error) {
+      console.error(
+        "Erro ao salvar preferências:",
+        error
+      );
+    }
+  }, [
+    preferencesLoaded,
+    noiseSuppression,
+    echoCancellation,
+    autoGainControl,
+    sensitivity,
+    pushToTalk,
+    shiuuu,
+  ]);
+
+  /*
+   * SENSIBILIDADE EM TEMPO REAL
    */
 
   useEffect(() => {
@@ -322,8 +435,7 @@ function JamRoom({
   }, [sensitivity]);
 
   /*
-   * Sincroniza interface
-   * com estado do LiveKit.
+   * SINCRONIZA LIVEKIT
    */
 
   useEffect(() => {
@@ -348,7 +460,7 @@ function JamRoom({
   ]);
 
   /*
-   * Limpeza ao sair.
+   * LIMPEZA
    */
 
   useEffect(() => {
@@ -371,8 +483,7 @@ function JamRoom({
     );
 
   /*
-   * Configuração da captura
-   * individual do microfone.
+   * OPÇÕES DO MICROFONE
    */
 
   function getMicOptions() {
@@ -380,9 +491,7 @@ function JamRoom({
       noiseSuppression,
       echoCancellation,
       autoGainControl,
-
       latency: 0,
-
       channelCount: 1,
     };
   }
@@ -401,10 +510,6 @@ function JamRoom({
 
     return true;
   }
-
-  /*
-   * LOCAL MIC TRACK
-   */
 
   function getLocalMicTrack() {
     return localParticipant
@@ -465,10 +570,12 @@ function JamRoom({
   }
 
   /*
-   * PUSH TO TALK ON / OFF
+   * PUSH TO TALK
    */
 
-  async function togglePushToTalk() {
+  async function setPushToTalkMode(
+    enabled: boolean
+  ) {
     if (!isConnected) {
       setMessage(
         "Aguarde a sala ficar LIVE."
@@ -477,18 +584,10 @@ function JamRoom({
       return;
     }
 
-    const nextState =
-      !pushToTalk;
-
     try {
-      if (nextState) {
-        stopMicMonitor();
+      stopMicMonitor();
 
-        /*
-         * Precisamos manter uma track
-         * publicada para o PTT ser rápido.
-         */
-
+      if (enabled) {
         let micTrack =
           getLocalMicTrack();
 
@@ -503,19 +602,12 @@ function JamRoom({
             getLocalMicTrack();
         }
 
-        /*
-         * Em vez de destruir a track,
-         * apenas mutamos.
-         */
-
         if (micTrack) {
           await micTrack.mute();
         }
 
         setPushToTalk(true);
-        setPushToTalkActive(
-          false
-        );
+        setPushToTalkActive(false);
         setMicOn(false);
 
         setMessage(
@@ -530,38 +622,28 @@ function JamRoom({
         }
 
         setPushToTalk(false);
-
-        setPushToTalkActive(
-          false
-        );
-
+        setPushToTalkActive(false);
         setMicOn(false);
 
         setMessage(
-          "Aperte para Falar desativado. O microfone permanece fechado."
+          "Aperte para Falar desativado."
         );
       }
 
       window.setTimeout(() => {
         setMessage("");
-      }, 3000);
+      }, 2500);
     } catch (error) {
-      console.error(
-        "Erro no Push-to-Talk:",
-        error
-      );
+      console.error(error);
 
       setMessage(
-        "Não foi possível alterar o modo Aperte para Falar."
+        "Não foi possível alterar o Push-to-Talk."
       );
     }
   }
 
   /*
    * ATALHO ESPAÇO
-   *
-   * Segura = abre.
-   * Solta = fecha.
    */
 
   useEffect(() => {
@@ -577,12 +659,6 @@ function JamRoom({
       try {
         let micTrack =
           getLocalMicTrack();
-
-        /*
-         * Segurança:
-         * cria a track se por algum
-         * motivo ela não existir.
-         */
 
         if (!micTrack) {
           await localParticipant
@@ -640,11 +716,6 @@ function JamRoom({
       const target =
         event.target as HTMLElement;
 
-      /*
-       * Não captura espaço enquanto
-       * usuário estiver digitando.
-       */
-
       if (
         target.tagName ===
           "INPUT" ||
@@ -685,12 +756,6 @@ function JamRoom({
 
       closePTT();
     }
-
-    /*
-     * Segurança:
-     * se o usuário segurar espaço
-     * e mudar de janela, fecha o mic.
-     */
 
     function handleBlur() {
       closePTT();
@@ -737,7 +802,7 @@ function JamRoom({
   ]);
 
   /*
-   * APLICAR CONFIG
+   * APLICAR CONFIGURAÇÕES
    */
 
   async function applyMicrophoneSettings() {
@@ -747,12 +812,6 @@ function JamRoom({
 
     try {
       stopMicMonitor();
-
-      /*
-       * Se PTT estiver ativo,
-       * recria track com os novos
-       * parâmetros e deixa mutada.
-       */
 
       if (pushToTalk) {
         await localParticipant
@@ -814,12 +873,12 @@ function JamRoom({
       setConfigOpen(false);
 
       setMessage(
-        "Configurações do microfone aplicadas."
+        "Configurações salvas."
       );
 
       window.setTimeout(() => {
         setMessage("");
-      }, 2500);
+      }, 2000);
     } catch (error) {
       console.error(error);
 
@@ -830,7 +889,43 @@ function JamRoom({
   }
 
   /*
-   * SCREEN SHARE
+   * RESTAURAR PADRÕES
+   */
+
+  async function resetAudioPreferences() {
+    try {
+      window.localStorage.removeItem(
+        AUDIO_PREFS_KEY
+      );
+
+      setNoiseSuppression(true);
+      setEchoCancellation(false);
+      setAutoGainControl(false);
+      setSensitivity(-45);
+      setShiuuu(false);
+
+      if (pushToTalk) {
+        await setPushToTalkMode(
+          false
+        );
+      } else {
+        setPushToTalk(false);
+      }
+
+      setMessage(
+        "Configurações padrão restauradas."
+      );
+
+      window.setTimeout(() => {
+        setMessage("");
+      }, 2500);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  /*
+   * COMPARTILHAMENTO
    */
 
   async function startScreenShare() {
@@ -900,7 +995,61 @@ function JamRoom({
   }
 
   /*
-   * CONVITE
+   * VOLTAR AO MENU
+   */
+
+  async function leaveRoom() {
+    try {
+      stopMicMonitor();
+
+      if (
+        localParticipant
+          .isScreenShareEnabled
+      ) {
+        await localParticipant
+          .setScreenShareEnabled(
+            false
+          );
+      }
+
+      const micTrack =
+        getLocalMicTrack();
+
+      if (micTrack) {
+        try {
+          await micTrack.mute();
+        } catch {}
+      }
+
+      if (
+        localParticipant
+          .isMicrophoneEnabled
+      ) {
+        try {
+          await localParticipant
+            .setMicrophoneEnabled(
+              false
+            );
+        } catch {}
+      }
+
+      try {
+        await room.disconnect();
+      } catch {}
+
+      router.push("/");
+    } catch (error) {
+      console.error(
+        "Erro ao sair da sala:",
+        error
+      );
+
+      router.push("/");
+    }
+  }
+
+  /*
+   * CONVIDAR
    */
 
   async function copyInvite() {
@@ -926,7 +1075,7 @@ function JamRoom({
   }
 
   /*
-   * MEDIDOR DO MICROFONE
+   * MEDIDOR
    */
 
   async function startMicMonitor() {
@@ -939,18 +1088,13 @@ function JamRoom({
 
       stopMicMonitor();
 
-      /*
-       * Se estiver em PTT,
-       * a track já deve existir
-       * mesmo estando mutada.
-       */
-
       let publication =
-        microphoneTrack;
+        localParticipant
+          .getTrackPublication(
+            Track.Source.Microphone
+          );
 
-      if (
-        !publication?.track
-      ) {
+      if (!publication?.track) {
         await localParticipant
           .setMicrophoneEnabled(
             true,
@@ -960,8 +1104,7 @@ function JamRoom({
         publication =
           localParticipant
             .getTrackPublication(
-              Track.Source
-                .Microphone
+              Track.Source.Microphone
             );
       }
 
@@ -977,8 +1120,7 @@ function JamRoom({
         publication =
           localParticipant
             .getTrackPublication(
-              Track.Source
-                .Microphone
+              Track.Source.Microphone
             );
       }
 
@@ -992,12 +1134,6 @@ function JamRoom({
 
         return;
       }
-
-      /*
-       * Se estiver PTT,
-       * abrimos temporariamente
-       * apenas para o teste.
-       */
 
       if (pushToTalk) {
         await livekitTrack.unmute();
@@ -1018,10 +1154,6 @@ function JamRoom({
 
         return;
       }
-
-      /*
-       * Clone para o analisador.
-       */
 
       const monitorTrack =
         originalMediaTrack.clone();
@@ -1059,14 +1191,10 @@ function JamRoom({
 
       analyser.fftSize = 2048;
 
-      analyser
-        .smoothingTimeConstant =
+      analyser.smoothingTimeConstant =
         0.45;
 
       source.connect(analyser);
-
-      analyserRef.current =
-        analyser;
 
       const samples =
         new Float32Array(
@@ -1180,19 +1308,9 @@ function JamRoom({
       }
     }
 
-    analyserRef.current =
-      null;
-
     setMonitoring(false);
-
     setMicLevel(-60);
-
     setIsSpeaking(false);
-
-    /*
-     * Após teste,
-     * volta PTT para fechado.
-     */
 
     if (pushToTalk) {
       const micTrack =
@@ -1213,7 +1331,7 @@ function JamRoom({
   }
 
   /*
-   * ÁUDIO REMOTO
+   * ÁUDIOS REMOTOS
    */
 
   const remoteMicrophones =
@@ -1231,10 +1349,6 @@ function JamRoom({
           .identity !==
         localParticipant.identity
     );
-
-  /*
-   * MEDIDORES
-   */
 
   const meterWidth =
     Math.max(
@@ -1259,7 +1373,7 @@ function JamRoom({
     );
 
   return (
-    <main className="min-h-screen bg-[#030706] text-white p-4 md:p-8">
+    <main className="min-h-screen bg-[#030706] p-4 text-white md:p-8">
 
       {/* ÁUDIO REMOTO */}
 
@@ -1289,14 +1403,26 @@ function JamRoom({
 
       </div>
 
-      {/* JANELA */}
-
       <div className="mx-auto max-w-7xl overflow-hidden rounded-[30px] border border-white/10 bg-[#07100f] shadow-2xl">
 
-        <div className="flex items-center gap-2 border-b border-white/10 px-6 py-4">
-          <span className="h-3 w-3 rounded-full bg-red-500" />
-          <span className="h-3 w-3 rounded-full bg-yellow-400" />
-          <span className="h-3 w-3 rounded-full bg-green-500" />
+        {/* TOPO */}
+
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+
+          <div className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full bg-red-500" />
+            <span className="h-3 w-3 rounded-full bg-yellow-400" />
+            <span className="h-3 w-3 rounded-full bg-green-500" />
+          </div>
+
+          <button
+            type="button"
+            onClick={leaveRoom}
+            className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-white/50 transition hover:border-white/20 hover:bg-white/5 hover:text-white"
+          >
+            ← VOLTAR AO MENU
+          </button>
+
         </div>
 
         <div className="relative min-h-[850px] p-6 md:p-10">
@@ -1368,7 +1494,7 @@ function JamRoom({
 
             </header>
 
-            {/* ALERTA */}
+            {/* MENSAGEM */}
 
             {message && (
               <div className="mx-auto mb-5 max-w-5xl rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-center text-sm text-cyan-300">
@@ -1477,6 +1603,7 @@ function JamRoom({
 
                 {participants.map(
                   (participant) => {
+
                     const isLocal =
                       participant.identity ===
                       localParticipant
@@ -1539,8 +1666,6 @@ function JamRoom({
 
             <div className="mx-auto mt-6 grid max-w-5xl grid-cols-2 gap-3 md:grid-cols-5">
 
-              {/* MICROFONE / PTT */}
-
               <button
                 type="button"
                 onClick={
@@ -1572,8 +1697,6 @@ function JamRoom({
                   ? "🎤 MUTE"
                   : "🎤 ATIVAR MIC"}
               </button>
-
-              {/* TELA */}
 
               {!isSharing ? (
                 <button
@@ -1608,8 +1731,6 @@ function JamRoom({
                 </button>
               )}
 
-              {/* SHIIUUU */}
-
               <button
                 type="button"
                 onClick={() =>
@@ -1629,8 +1750,6 @@ function JamRoom({
                   : "SHIIUUU"}
               </button>
 
-              {/* CONVIDAR */}
-
               <button
                 type="button"
                 onClick={copyInvite}
@@ -1639,14 +1758,10 @@ function JamRoom({
                 🔗 CONVIDAR
               </button>
 
-              {/* CONFIG */}
-
               <button
                 type="button"
                 onClick={() =>
-                  setConfigOpen(
-                    true
-                  )
+                  setConfigOpen(true)
                 }
                 className="rounded-2xl border border-white/10 px-5 py-4 font-semibold text-white/60"
               >
@@ -1654,8 +1769,6 @@ function JamRoom({
               </button>
 
             </div>
-
-            {/* AVISO PTT */}
 
             {pushToTalk && (
               <div className="mx-auto mt-5 max-w-5xl rounded-xl border border-cyan-400/15 bg-cyan-400/[0.03] px-4 py-3 text-center text-sm">
@@ -1679,7 +1792,7 @@ function JamRoom({
         </div>
       </div>
 
-      {/* MODAL CONFIG */}
+      {/* CONFIG */}
 
       {configOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5">
@@ -1694,7 +1807,7 @@ function JamRoom({
                 </h2>
 
                 <p className="mt-1 text-sm text-white/40">
-                  Essas configurações valem somente para você.
+                  Salvas automaticamente neste navegador.
                 </p>
               </div>
 
@@ -1702,10 +1815,7 @@ function JamRoom({
                 type="button"
                 onClick={() => {
                   stopMicMonitor();
-
-                  setConfigOpen(
-                    false
-                  );
+                  setConfigOpen(false);
                 }}
                 className="text-2xl text-white/40"
               >
@@ -1716,32 +1826,29 @@ function JamRoom({
 
             <div className="mt-7 space-y-6">
 
-              {/* PTT */}
-
               <SettingToggle
                 label="Aperte para Falar"
-                description="Segure a tecla Espaço para abrir seu microfone."
+                description="Segure ESPAÇO para abrir seu microfone."
                 value={
                   pushToTalk
                 }
-                onChange={() => {
-                  togglePushToTalk();
+                onChange={(value) => {
+                  setPushToTalkMode(
+                    value
+                  );
                 }}
               />
 
               {pushToTalk && (
-                <div
-                  className={`rounded-2xl border p-4 ${
-                    pushToTalkActive
-                      ? "border-lime-400/30 bg-lime-400/5"
-                      : "border-cyan-400/20 bg-cyan-400/5"
-                  }`}
-                >
+                <div className={`rounded-2xl border p-4 ${
+                  pushToTalkActive
+                    ? "border-lime-400/30 bg-lime-400/5"
+                    : "border-cyan-400/20 bg-cyan-400/5"
+                }`}>
 
                   <div className="flex items-center justify-between gap-4">
 
                     <div>
-
                       <p className="font-medium">
                         Push-to-Talk
                       </p>
@@ -1749,16 +1856,13 @@ function JamRoom({
                       <p className="mt-1 text-sm text-white/40">
                         Segure ESPAÇO enquanto estiver falando.
                       </p>
-
                     </div>
 
-                    <span
-                      className={`rounded-lg border px-4 py-2 text-sm font-bold ${
-                        pushToTalkActive
-                          ? "border-lime-400/40 bg-lime-400/10 text-lime-400"
-                          : "border-white/10 text-white/50"
-                      }`}
-                    >
+                    <span className={`rounded-lg border px-4 py-2 text-sm font-bold ${
+                      pushToTalkActive
+                        ? "border-lime-400/40 bg-lime-400/10 text-lime-400"
+                        : "border-white/10 text-white/50"
+                    }`}>
                       {pushToTalkActive
                         ? "FALANDO"
                         : "ESPAÇO"}
@@ -1768,8 +1872,6 @@ function JamRoom({
 
                 </div>
               )}
-
-              {/* NOISE SUPPRESSION */}
 
               <SettingToggle
                 label="Supressão de ruído"
@@ -1782,8 +1884,6 @@ function JamRoom({
                 }
               />
 
-              {/* ECO */}
-
               <SettingToggle
                 label="Cancelamento de eco"
                 description="Útil se estiver usando caixas de som."
@@ -1794,8 +1894,6 @@ function JamRoom({
                   setEchoCancellation
                 }
               />
-
-              {/* AUTO GAIN */}
 
               <SettingToggle
                 label="Ganho automático"
@@ -1808,14 +1906,11 @@ function JamRoom({
                 }
               />
 
-              {/* SENSIBILIDADE */}
-
               <div>
 
                 <div className="flex justify-between gap-4">
 
                   <div>
-
                     <p className="font-medium">
                       Sensibilidade da voz
                     </p>
@@ -1823,7 +1918,6 @@ function JamRoom({
                     <p className="text-sm text-white/40">
                       Ajuste o nível mínimo para detectar sua voz.
                     </p>
-
                   </div>
 
                   <span className="whitespace-nowrap text-cyan-400">
@@ -1862,14 +1956,13 @@ function JamRoom({
 
               </div>
 
-              {/* TESTE MIC */}
+              {/* TESTE DO MICROFONE */}
 
               <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
 
                 <div className="flex flex-wrap items-start justify-between gap-3">
 
                   <div>
-
                     <p className="font-medium">
                       Teste do microfone
                     </p>
@@ -1877,16 +1970,13 @@ function JamRoom({
                     <p className="mt-1 text-sm text-white/40">
                       Fale normalmente para ajustar.
                     </p>
-
                   </div>
 
-                  <span
-                    className={`text-sm font-semibold ${
-                      isSpeaking
-                        ? "text-lime-400"
-                        : "text-white/30"
-                    }`}
-                  >
+                  <span className={`text-sm font-semibold ${
+                    isSpeaking
+                      ? "text-lime-400"
+                      : "text-white/30"
+                  }`}>
                     {isSpeaking
                       ? "VOZ DETECTADA"
                       : monitoring
@@ -1922,23 +2012,17 @@ function JamRoom({
 
                 <div className="mt-2 flex justify-between text-xs text-white/30">
 
-                  <span>
-                    -60 dB
-                  </span>
+                  <span>-60 dB</span>
 
-                  <span
-                    className={
-                      isSpeaking
-                        ? "text-lime-400"
-                        : "text-white/50"
-                    }
-                  >
+                  <span className={
+                    isSpeaking
+                      ? "text-lime-400"
+                      : "text-white/50"
+                  }>
                     {micLevel} dB
                   </span>
 
-                  <span>
-                    0 dB
-                  </span>
+                  <span>0 dB</span>
 
                 </div>
 
@@ -1971,9 +2055,19 @@ function JamRoom({
 
               </div>
 
-            </div>
+              {/* RESTAURAR */}
 
-            {/* SALVAR */}
+              <button
+                type="button"
+                onClick={
+                  resetAudioPreferences
+                }
+                className="w-full rounded-xl border border-white/10 px-4 py-3 text-sm font-semibold text-white/40 transition hover:border-red-400/20 hover:bg-red-400/5 hover:text-red-300"
+              >
+                ↺ RESTAURAR CONFIGURAÇÕES PADRÃO
+              </button>
+
+            </div>
 
             <div className="mt-8 flex gap-3">
 
@@ -1981,10 +2075,7 @@ function JamRoom({
                 type="button"
                 onClick={() => {
                   stopMicMonitor();
-
-                  setConfigOpen(
-                    false
-                  );
+                  setConfigOpen(false);
                 }}
                 className="flex-1 rounded-xl border border-white/10 px-5 py-4 text-white/50"
               >
@@ -2032,7 +2123,6 @@ function SettingToggle({
     <div className="flex items-center justify-between gap-4">
 
       <div>
-
         <p className="font-medium">
           {label}
         </p>
@@ -2040,7 +2130,6 @@ function SettingToggle({
         <p className="mt-1 text-sm text-white/40">
           {description}
         </p>
-
       </div>
 
       <button
@@ -2054,7 +2143,6 @@ function SettingToggle({
             : "bg-white/10"
         }`}
       >
-
         <span
           className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${
             value
@@ -2062,7 +2150,6 @@ function SettingToggle({
               : "left-1"
           }`}
         />
-
       </button>
 
     </div>
