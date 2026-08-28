@@ -28,14 +28,21 @@ export default function RoomPage() {
   const params = useParams();
   const searchParams = useSearchParams();
 
-  const roomName = String(params.roomName || "").toUpperCase();
-  const participantName = searchParams.get("name") || "Visitante";
+  const roomName = String(
+    params.roomName || ""
+  ).toUpperCase();
+
+  const participantName =
+    searchParams.get("name") || "Visitante";
 
   const [tokenData, setTokenData] =
     useState<TokenResponse | null>(null);
 
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [error, setError] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
 
   useEffect(() => {
     async function connectToRoom() {
@@ -43,22 +50,28 @@ export default function RoomPage() {
         setLoading(true);
         setError("");
 
-        const response = await fetch("/api/token", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            roomName,
-            participantName,
-          }),
-        });
+        const response = await fetch(
+          "/api/token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              roomName,
+              participantName,
+            }),
+          }
+        );
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
         if (!response.ok) {
           throw new Error(
-            data.error || "Erro ao conectar ao LiveKit."
+            data.error ||
+              "Erro ao conectar ao LiveKit."
           );
         }
 
@@ -77,7 +90,10 @@ export default function RoomPage() {
     if (roomName) {
       connectToRoom();
     }
-  }, [roomName, participantName]);
+  }, [
+    roomName,
+    participantName,
+  ]);
 
   if (loading) {
     return (
@@ -88,7 +104,8 @@ export default function RoomPage() {
           </h1>
 
           <p className="mt-5 text-white/50">
-            Conectando à sala {roomName}...
+            Conectando à sala{" "}
+            {roomName}...
           </p>
         </div>
       </main>
@@ -104,7 +121,8 @@ export default function RoomPage() {
           </h1>
 
           <p className="mt-4 text-white/60">
-            {error || "Token indisponível."}
+            {error ||
+              "Token indisponível."}
           </p>
 
           <a
@@ -121,7 +139,9 @@ export default function RoomPage() {
   return (
     <LiveKitRoom
       token={tokenData.token}
-      serverUrl={tokenData.serverUrl}
+      serverUrl={
+        tokenData.serverUrl
+      }
       connect={true}
       audio={false}
       video={false}
@@ -129,7 +149,9 @@ export default function RoomPage() {
     >
       <JamRoom
         roomName={roomName}
-        participantName={participantName}
+        participantName={
+          participantName
+        }
       />
     </LiveKitRoom>
   );
@@ -142,13 +164,15 @@ function JamRoom({
   roomName: string;
   participantName: string;
 }) {
-  const room = useRoomContext();
+  const room =
+    useRoomContext();
 
   const connectionState =
     useConnectionState(room);
 
   const isConnected =
-    connectionState === ConnectionState.Connected;
+    connectionState ===
+    ConnectionState.Connected;
 
   const participants =
     useParticipants();
@@ -165,74 +189,132 @@ function JamRoom({
     }
   );
 
-  const microphoneTracks = useTracks(
-    [Track.Source.Microphone],
-    {
-      onlySubscribed: true,
-    }
-  );
+  const microphoneTracks =
+    useTracks(
+      [Track.Source.Microphone],
+      {
+        onlySubscribed: true,
+      }
+    );
 
-  const screenAudioTracks = useTracks(
-    [Track.Source.ScreenShareAudio],
-    {
-      onlySubscribed: true,
-    }
-  );
+  const screenAudioTracks =
+    useTracks(
+      [
+        Track.Source
+          .ScreenShareAudio,
+      ],
+      {
+        onlySubscribed: true,
+      }
+    );
+
+  /*
+   * ESTADOS PRINCIPAIS
+   */
 
   const [micOn, setMicOn] =
     useState(false);
 
-  const [isSharing, setIsSharing] =
-    useState(false);
+  const [
+    isSharing,
+    setIsSharing,
+  ] = useState(false);
 
   const [shiuuu, setShiuuu] =
     useState(false);
 
-  const [configOpen, setConfigOpen] =
-    useState(false);
+  const [
+    configOpen,
+    setConfigOpen,
+  ] = useState(false);
 
-  const [noiseSuppression, setNoiseSuppression] =
-    useState(true);
+  /*
+   * CONFIGURAÇÕES DO MICROFONE
+   */
 
-  const [echoCancellation, setEchoCancellation] =
-    useState(false);
+  const [
+    noiseSuppression,
+    setNoiseSuppression,
+  ] = useState(true);
 
-  const [autoGainControl, setAutoGainControl] =
-    useState(false);
+  const [
+    echoCancellation,
+    setEchoCancellation,
+  ] = useState(false);
 
-  const [sensitivity, setSensitivity] =
-    useState(-45);
+  const [
+    autoGainControl,
+    setAutoGainControl,
+  ] = useState(false);
 
-  const [micLevel, setMicLevel] =
-    useState(-60);
+  const [
+    sensitivity,
+    setSensitivity,
+  ] = useState(-45);
 
-  const [isSpeaking, setIsSpeaking] =
-    useState(false);
+  /*
+   * PUSH TO TALK
+   */
 
-  const [monitoring, setMonitoring] =
-    useState(false);
+  const [
+    pushToTalk,
+    setPushToTalk,
+  ] = useState(false);
+
+  const [
+    pushToTalkActive,
+    setPushToTalkActive,
+  ] = useState(false);
+
+  /*
+   * MEDIDOR
+   */
+
+  const [
+    micLevel,
+    setMicLevel,
+  ] = useState(-60);
+
+  const [
+    isSpeaking,
+    setIsSpeaking,
+  ] = useState(false);
+
+  const [
+    monitoring,
+    setMonitoring,
+  ] = useState(false);
 
   const [message, setMessage] =
     useState("");
 
   const audioContextRef =
-    useRef<AudioContext | null>(null);
+    useRef<AudioContext | null>(
+      null
+    );
 
   const analyserRef =
-    useRef<AnalyserNode | null>(null);
+    useRef<AnalyserNode | null>(
+      null
+    );
 
   const animationRef =
-    useRef<number | null>(null);
+    useRef<number | null>(
+      null
+    );
 
   const monitorTrackRef =
-    useRef<MediaStreamTrack | null>(null);
+    useRef<MediaStreamTrack | null>(
+      null
+    );
 
-  /*
-   * Usamos ref para o analyser sempre enxergar
-   * o valor MAIS RECENTE do slider.
-   */
   const sensitivityRef =
     useRef(sensitivity);
+
+  /*
+   * Mantém threshold atualizado
+   * durante o teste do mic.
+   */
 
   useEffect(() => {
     sensitivityRef.current =
@@ -240,25 +322,35 @@ function JamRoom({
   }, [sensitivity]);
 
   /*
-   * Sincroniza interface com LiveKit.
+   * Sincroniza interface
+   * com estado do LiveKit.
    */
+
   useEffect(() => {
-    setMicOn(
-      localParticipant.isMicrophoneEnabled
-    );
+    if (!pushToTalk) {
+      setMicOn(
+        localParticipant
+          .isMicrophoneEnabled
+      );
+    }
 
     setIsSharing(
-      localParticipant.isScreenShareEnabled
+      localParticipant
+        .isScreenShareEnabled
     );
   }, [
     localParticipant,
-    localParticipant.isMicrophoneEnabled,
-    localParticipant.isScreenShareEnabled,
+    localParticipant
+      .isMicrophoneEnabled,
+    localParticipant
+      .isScreenShareEnabled,
+    pushToTalk,
   ]);
 
   /*
-   * Limpeza quando o componente sair.
+   * Limpeza ao sair.
    */
+
   useEffect(() => {
     return () => {
       stopMicMonitor();
@@ -270,47 +362,38 @@ function JamRoom({
       ? screenTracks[0]
       : undefined;
 
-  /*
-   * Existe outra pessoa compartilhando?
-   */
   const someoneElseSharing =
     screenTracks.some(
       (track) =>
-        track.participant.identity !==
+        track.participant
+          .identity !==
         localParticipant.identity
     );
 
   /*
-   * Configurações individuais do mic.
+   * Configuração da captura
+   * individual do microfone.
    */
+
   function getMicOptions() {
     return {
       noiseSuppression,
       echoCancellation,
       autoGainControl,
 
-      /*
-       * Pedimos baixa latência.
-       */
       latency: 0,
 
-      /*
-       * Voz = mono.
-       */
       channelCount: 1,
     };
   }
 
-  /*
-   * Proteção central contra o erro:
-   * "engine not connected".
-   */
   function canPublishMedia() {
     if (!isConnected) {
       setMessage(
-        connectionState === ConnectionState.Reconnecting
-          ? "Reconectando ao servidor. Aguarde alguns segundos..."
-          : "Conectando ao servidor. Aguarde alguns segundos..."
+        connectionState ===
+          ConnectionState.Reconnecting
+          ? "Reconectando ao servidor..."
+          : "Conectando ao servidor..."
       );
 
       return false;
@@ -320,9 +403,30 @@ function JamRoom({
   }
 
   /*
-   * MICROFONE
+   * LOCAL MIC TRACK
    */
+
+  function getLocalMicTrack() {
+    return localParticipant
+      .getTrackPublication(
+        Track.Source.Microphone
+      )
+      ?.track;
+  }
+
+  /*
+   * MICROFONE NORMAL
+   */
+
   async function toggleMicrophone() {
+    if (pushToTalk) {
+      setMessage(
+        "Aperte para Falar está ativo. Segure ESPAÇO para falar."
+      );
+
+      return;
+    }
+
     if (!canPublishMedia()) {
       return;
     }
@@ -330,46 +434,312 @@ function JamRoom({
     try {
       setMessage("");
 
-      if (localParticipant.isMicrophoneEnabled) {
+      if (
+        localParticipant
+          .isMicrophoneEnabled
+      ) {
         stopMicMonitor();
 
-        await localParticipant.setMicrophoneEnabled(
-          false
-        );
+        await localParticipant
+          .setMicrophoneEnabled(
+            false
+          );
 
         setMicOn(false);
       } else {
-        await localParticipant.setMicrophoneEnabled(
-          true,
-          getMicOptions()
-        );
+        await localParticipant
+          .setMicrophoneEnabled(
+            true,
+            getMicOptions()
+          );
 
         setMicOn(true);
       }
     } catch (error) {
-      const text =
-        error instanceof Error
-          ? error.message
-          : "";
+      console.error(error);
 
-      if (
-        text.includes("not connected") ||
-        text.includes("timeout")
-      ) {
-        setMessage(
-          "A conexão ainda não estava pronta. Aguarde 2 segundos e tente novamente."
-        );
-      } else {
-        setMessage(
-          "Não foi possível ativar o microfone. Confira a permissão do navegador."
-        );
-      }
+      setMessage(
+        "Não foi possível alterar o microfone."
+      );
     }
   }
 
   /*
-   * APLICAR CONFIGURAÇÕES
+   * PUSH TO TALK ON / OFF
    */
+
+  async function togglePushToTalk() {
+    if (!isConnected) {
+      setMessage(
+        "Aguarde a sala ficar LIVE."
+      );
+
+      return;
+    }
+
+    const nextState =
+      !pushToTalk;
+
+    try {
+      if (nextState) {
+        stopMicMonitor();
+
+        /*
+         * Precisamos manter uma track
+         * publicada para o PTT ser rápido.
+         */
+
+        let micTrack =
+          getLocalMicTrack();
+
+        if (!micTrack) {
+          await localParticipant
+            .setMicrophoneEnabled(
+              true,
+              getMicOptions()
+            );
+
+          micTrack =
+            getLocalMicTrack();
+        }
+
+        /*
+         * Em vez de destruir a track,
+         * apenas mutamos.
+         */
+
+        if (micTrack) {
+          await micTrack.mute();
+        }
+
+        setPushToTalk(true);
+        setPushToTalkActive(
+          false
+        );
+        setMicOn(false);
+
+        setMessage(
+          "Aperte para Falar ativado. Segure ESPAÇO para falar."
+        );
+      } else {
+        const micTrack =
+          getLocalMicTrack();
+
+        if (micTrack) {
+          await micTrack.mute();
+        }
+
+        setPushToTalk(false);
+
+        setPushToTalkActive(
+          false
+        );
+
+        setMicOn(false);
+
+        setMessage(
+          "Aperte para Falar desativado. O microfone permanece fechado."
+        );
+      }
+
+      window.setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error(
+        "Erro no Push-to-Talk:",
+        error
+      );
+
+      setMessage(
+        "Não foi possível alterar o modo Aperte para Falar."
+      );
+    }
+  }
+
+  /*
+   * ATALHO ESPAÇO
+   *
+   * Segura = abre.
+   * Solta = fecha.
+   */
+
+  useEffect(() => {
+    if (!pushToTalk) {
+      return;
+    }
+
+    async function openPTT() {
+      if (!isConnected) {
+        return;
+      }
+
+      try {
+        let micTrack =
+          getLocalMicTrack();
+
+        /*
+         * Segurança:
+         * cria a track se por algum
+         * motivo ela não existir.
+         */
+
+        if (!micTrack) {
+          await localParticipant
+            .setMicrophoneEnabled(
+              true,
+              getMicOptions()
+            );
+
+          micTrack =
+            getLocalMicTrack();
+        }
+
+        if (micTrack) {
+          await micTrack.unmute();
+
+          setPushToTalkActive(
+            true
+          );
+
+          setMicOn(true);
+        }
+      } catch (error) {
+        console.error(
+          "Erro abrindo PTT:",
+          error
+        );
+      }
+    }
+
+    async function closePTT() {
+      try {
+        const micTrack =
+          getLocalMicTrack();
+
+        if (micTrack) {
+          await micTrack.mute();
+        }
+
+        setPushToTalkActive(
+          false
+        );
+
+        setMicOn(false);
+      } catch (error) {
+        console.error(
+          "Erro fechando PTT:",
+          error
+        );
+      }
+    }
+
+    function handleKeyDown(
+      event: KeyboardEvent
+    ) {
+      const target =
+        event.target as HTMLElement;
+
+      /*
+       * Não captura espaço enquanto
+       * usuário estiver digitando.
+       */
+
+      if (
+        target.tagName ===
+          "INPUT" ||
+        target.tagName ===
+          "TEXTAREA" ||
+        target.tagName ===
+          "SELECT" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      if (
+        event.code !== "Space"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      if (event.repeat) {
+        return;
+      }
+
+      openPTT();
+    }
+
+    function handleKeyUp(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.code !== "Space"
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+
+      closePTT();
+    }
+
+    /*
+     * Segurança:
+     * se o usuário segurar espaço
+     * e mudar de janela, fecha o mic.
+     */
+
+    function handleBlur() {
+      closePTT();
+    }
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+    window.addEventListener(
+      "keyup",
+      handleKeyUp
+    );
+
+    window.addEventListener(
+      "blur",
+      handleBlur
+    );
+
+    return () => {
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
+
+      window.removeEventListener(
+        "keyup",
+        handleKeyUp
+      );
+
+      window.removeEventListener(
+        "blur",
+        handleBlur
+      );
+    };
+  }, [
+    pushToTalk,
+    isConnected,
+    localParticipant,
+    noiseSuppression,
+    echoCancellation,
+    autoGainControl,
+  ]);
+
+  /*
+   * APLICAR CONFIG
+   */
+
   async function applyMicrophoneSettings() {
     if (!canPublishMedia()) {
       return;
@@ -378,28 +748,67 @@ function JamRoom({
     try {
       stopMicMonitor();
 
-      const wasEnabled =
-        localParticipant.isMicrophoneEnabled;
+      /*
+       * Se PTT estiver ativo,
+       * recria track com os novos
+       * parâmetros e deixa mutada.
+       */
 
-      if (wasEnabled) {
-        /*
-         * Recriamos a track para aplicar
-         * as novas MediaTrackConstraints.
-         */
-        await localParticipant.setMicrophoneEnabled(
-          false
+      if (pushToTalk) {
+        await localParticipant
+          .setMicrophoneEnabled(
+            false
+          );
+
+        await new Promise(
+          (resolve) =>
+            setTimeout(
+              resolve,
+              150
+            )
         );
 
-        await new Promise((resolve) =>
-          setTimeout(resolve, 150)
-        );
+        await localParticipant
+          .setMicrophoneEnabled(
+            true,
+            getMicOptions()
+          );
 
-        await localParticipant.setMicrophoneEnabled(
-          true,
-          getMicOptions()
-        );
+        const micTrack =
+          getLocalMicTrack();
 
-        setMicOn(true);
+        if (micTrack) {
+          await micTrack.mute();
+        }
+
+        setMicOn(false);
+      } else {
+        const wasEnabled =
+          localParticipant
+            .isMicrophoneEnabled;
+
+        if (wasEnabled) {
+          await localParticipant
+            .setMicrophoneEnabled(
+              false
+            );
+
+          await new Promise(
+            (resolve) =>
+              setTimeout(
+                resolve,
+                150
+              )
+          );
+
+          await localParticipant
+            .setMicrophoneEnabled(
+              true,
+              getMicOptions()
+            );
+
+          setMicOn(true);
+        }
       }
 
       setConfigOpen(false);
@@ -411,16 +820,19 @@ function JamRoom({
       window.setTimeout(() => {
         setMessage("");
       }, 2500);
-    } catch {
+    } catch (error) {
+      console.error(error);
+
       setMessage(
-        "Não foi possível aplicar as configurações do microfone."
+        "Não foi possível aplicar as configurações."
       );
     }
   }
 
   /*
-   * COMPARTILHAMENTO DE TELA
+   * SCREEN SHARE
    */
+
   async function startScreenShare() {
     if (!canPublishMedia()) {
       return;
@@ -432,14 +844,19 @@ function JamRoom({
       const remoteSharer =
         screenTracks.find(
           (track) =>
-            track.participant.identity !==
-            localParticipant.identity
+            track.participant
+              .identity !==
+            localParticipant
+              .identity
         );
 
       if (remoteSharer) {
         const sharerName =
-          remoteSharer.participant.name ||
-          remoteSharer.participant.identity ||
+          remoteSharer
+            .participant.name ||
+          remoteSharer
+            .participant
+            .identity ||
           "Outro participante";
 
         setMessage(
@@ -449,40 +866,30 @@ function JamRoom({
         return;
       }
 
-      await localParticipant.setScreenShareEnabled(
-        true,
-        {
-          audio: true,
-        }
-      );
+      await localParticipant
+        .setScreenShareEnabled(
+          true,
+          {
+            audio: true,
+          }
+        );
 
       setIsSharing(true);
     } catch (error) {
-      const text =
-        error instanceof Error
-          ? error.message
-          : "";
+      console.error(error);
 
-      if (
-        text.includes("not connected") ||
-        text.includes("timeout")
-      ) {
-        setMessage(
-          "A conexão ainda não estava pronta para transmitir. Tente novamente."
-        );
-      } else {
-        setMessage(
-          "Compartilhamento cancelado ou não permitido pelo navegador."
-        );
-      }
+      setMessage(
+        "Compartilhamento cancelado ou não permitido."
+      );
     }
   }
 
   async function stopScreenShare() {
     try {
-      await localParticipant.setScreenShareEnabled(
-        false
-      );
+      await localParticipant
+        .setScreenShareEnabled(
+          false
+        );
 
       setIsSharing(false);
     } catch {
@@ -495,14 +902,14 @@ function JamRoom({
   /*
    * CONVITE
    */
+
   async function copyInvite() {
     try {
       const inviteUrl =
         `${window.location.origin}/room/${roomName}`;
 
-      await navigator.clipboard.writeText(
-        inviteUrl
-      );
+      await navigator.clipboard
+        .writeText(inviteUrl);
 
       setMessage(
         "Link copiado! Envie para seus amigos."
@@ -519,8 +926,9 @@ function JamRoom({
   }
 
   /*
-   * TESTE / MEDIDOR DO MICROFONE
+   * MEDIDOR DO MICROFONE
    */
+
   async function startMicMonitor() {
     if (!canPublishMedia()) {
       return;
@@ -529,56 +937,49 @@ function JamRoom({
     try {
       setMessage("");
 
-      /*
-       * Para eventual monitor anterior.
-       */
       stopMicMonitor();
 
       /*
-       * Primeiro tentamos usar a track atual.
+       * Se estiver em PTT,
+       * a track já deve existir
+       * mesmo estando mutada.
        */
+
       let publication =
         microphoneTrack;
 
-      /*
-       * Se o mic estiver desligado,
-       * nós o ligamos primeiro.
-       */
       if (
-        !localParticipant.isMicrophoneEnabled ||
         !publication?.track
       ) {
-        const createdPublication =
-          await localParticipant.setMicrophoneEnabled(
+        await localParticipant
+          .setMicrophoneEnabled(
             true,
             getMicOptions()
           );
 
-        setMicOn(true);
-
-        /*
-         * Se o LiveKit devolveu a publicação,
-         * usamos imediatamente.
-         */
-        if (createdPublication) {
-          publication =
-            createdPublication;
-        }
+        publication =
+          localParticipant
+            .getTrackPublication(
+              Track.Source
+                .Microphone
+            );
       }
 
-      /*
-       * Dá tempo para o estado React/LiveKit
-       * receber a publicação caso necessário.
-       */
       if (!publication?.track) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, 300)
+        await new Promise(
+          (resolve) =>
+            setTimeout(
+              resolve,
+              300
+            )
         );
 
         publication =
-          localParticipant.getTrackPublication(
-            Track.Source.Microphone
-          );
+          localParticipant
+            .getTrackPublication(
+              Track.Source
+                .Microphone
+            );
       }
 
       const livekitTrack =
@@ -586,14 +987,29 @@ function JamRoom({
 
       if (!livekitTrack) {
         setMessage(
-          "O microfone foi ativado, mas a track ainda não ficou disponível. Clique em TESTAR novamente."
+          "Não foi possível acessar o microfone."
         );
 
         return;
       }
 
+      /*
+       * Se estiver PTT,
+       * abrimos temporariamente
+       * apenas para o teste.
+       */
+
+      if (pushToTalk) {
+        await livekitTrack.unmute();
+
+        setPushToTalkActive(
+          true
+        );
+      }
+
       const originalMediaTrack =
-        livekitTrack.mediaStreamTrack;
+        livekitTrack
+          .mediaStreamTrack;
 
       if (!originalMediaTrack) {
         setMessage(
@@ -604,12 +1020,9 @@ function JamRoom({
       }
 
       /*
-       * IMPORTANTE:
-       *
-       * Clonamos a track para o medidor.
-       * Assim o analyser NÃO interfere na
-       * track que está sendo enviada ao LiveKit.
+       * Clone para o analisador.
        */
+
       const monitorTrack =
         originalMediaTrack.clone();
 
@@ -623,7 +1036,8 @@ function JamRoom({
         audioContext;
 
       if (
-        audioContext.state === "suspended"
+        audioContext.state ===
+        "suspended"
       ) {
         await audioContext.resume();
       }
@@ -634,19 +1048,19 @@ function JamRoom({
         ]);
 
       const source =
-        audioContext.createMediaStreamSource(
-          stream
-        );
+        audioContext
+          .createMediaStreamSource(
+            stream
+          );
 
       const analyser =
-        audioContext.createAnalyser();
+        audioContext
+          .createAnalyser();
 
       analyser.fftSize = 2048;
 
-      /*
-       * Menor valor = resposta mais rápida.
-       */
-      analyser.smoothingTimeConstant =
+      analyser
+        .smoothingTimeConstant =
         0.45;
 
       source.connect(analyser);
@@ -662,9 +1076,10 @@ function JamRoom({
       setMonitoring(true);
 
       function readLevel() {
-        analyser.getFloatTimeDomainData(
-          samples
-        );
+        analyser
+          .getFloatTimeDomainData(
+            samples
+          );
 
         let sum = 0;
 
@@ -690,24 +1105,18 @@ function JamRoom({
               Math.log10(rms)
             : -60;
 
-        /*
-         * Limitamos visualmente entre
-         * -60 e 0 dB.
-         */
         db = Math.max(
           -60,
-          Math.min(0, db)
+          Math.min(
+            0,
+            db
+          )
         );
 
         setMicLevel(
           Math.round(db)
         );
 
-        /*
-         * AGORA usa o valor atual do slider,
-         * mesmo que ele seja alterado enquanto
-         * o medidor estiver funcionando.
-         */
         setIsSpeaking(
           db >=
             sensitivityRef.current
@@ -721,49 +1130,40 @@ function JamRoom({
 
       readLevel();
     } catch (error) {
-      const text =
-        error instanceof Error
-          ? error.message
-          : "";
+      console.error(error);
 
-      if (
-        text.includes("not connected") ||
-        text.includes("timeout")
-      ) {
-        setMessage(
-          "A conexão com o servidor ainda não estava pronta. Aguarde alguns segundos e teste novamente."
-        );
-      } else {
-        setMessage(
-          "Não foi possível iniciar o teste. Confira se o Chrome tem permissão para usar o microfone."
-        );
-      }
+      setMessage(
+        "Não foi possível iniciar o teste do microfone."
+      );
     }
   }
 
   function stopMicMonitor() {
     if (
-      animationRef.current !== null
+      animationRef.current !==
+      null
     ) {
       cancelAnimationFrame(
         animationRef.current
       );
 
-      animationRef.current = null;
+      animationRef.current =
+        null;
     }
 
-    /*
-     * Paramos SOMENTE a cópia usada
-     * pelo analisador.
-     */
-    if (monitorTrackRef.current) {
-      monitorTrackRef.current.stop();
+    if (
+      monitorTrackRef.current
+    ) {
+      monitorTrackRef.current
+        .stop();
 
       monitorTrackRef.current =
         null;
     }
 
-    if (audioContextRef.current) {
+    if (
+      audioContextRef.current
+    ) {
       const context =
         audioContextRef.current;
 
@@ -771,7 +1171,8 @@ function JamRoom({
         null;
 
       if (
-        context.state !== "closed"
+        context.state !==
+        "closed"
       ) {
         context
           .close()
@@ -779,39 +1180,69 @@ function JamRoom({
       }
     }
 
-    analyserRef.current = null;
+    analyserRef.current =
+      null;
 
     setMonitoring(false);
+
     setMicLevel(-60);
+
     setIsSpeaking(false);
+
+    /*
+     * Após teste,
+     * volta PTT para fechado.
+     */
+
+    if (pushToTalk) {
+      const micTrack =
+        getLocalMicTrack();
+
+      if (micTrack) {
+        micTrack
+          .mute()
+          .catch(() => {});
+      }
+
+      setPushToTalkActive(
+        false
+      );
+
+      setMicOn(false);
+    }
   }
 
   /*
    * ÁUDIO REMOTO
    */
+
   const remoteMicrophones =
     microphoneTracks.filter(
       (track) =>
-        track.participant.identity !==
+        track.participant
+          .identity !==
         localParticipant.identity
     );
 
   const remoteScreenAudio =
     screenAudioTracks.filter(
       (track) =>
-        track.participant.identity !==
+        track.participant
+          .identity !==
         localParticipant.identity
     );
 
   /*
-   * Conversão dB → porcentagem.
+   * MEDIDORES
    */
+
   const meterWidth =
     Math.max(
       0,
       Math.min(
         100,
-        ((micLevel + 60) / 60) *
+        ((micLevel + 60) /
+          60) *
           100
       )
     );
@@ -830,18 +1261,14 @@ function JamRoom({
   return (
     <main className="min-h-screen bg-[#030706] text-white p-4 md:p-8">
 
-      {/* ÁUDIOS RECEBIDOS */}
+      {/* ÁUDIO REMOTO */}
 
       <div className="hidden">
 
         {remoteScreenAudio.map(
           (track) => (
             <AudioTrack
-              key={
-                track.participant
-                  .identity +
-                "-screen-audio"
-              }
+              key={`${track.participant.identity}-screen`}
               trackRef={track}
               volume={1}
               muted={false}
@@ -852,11 +1279,7 @@ function JamRoom({
         {remoteMicrophones.map(
           (track) => (
             <AudioTrack
-              key={
-                track.participant
-                  .identity +
-                "-microphone"
-              }
+              key={`${track.participant.identity}-mic`}
               trackRef={track}
               volume={1}
               muted={shiuuu}
@@ -866,7 +1289,7 @@ function JamRoom({
 
       </div>
 
-      {/* JANELA PRINCIPAL */}
+      {/* JANELA */}
 
       <div className="mx-auto max-w-7xl overflow-hidden rounded-[30px] border border-white/10 bg-[#07100f] shadow-2xl">
 
@@ -945,7 +1368,7 @@ function JamRoom({
 
             </header>
 
-            {/* AVISO */}
+            {/* ALERTA */}
 
             {message && (
               <div className="mx-auto mb-5 max-w-5xl rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-center text-sm text-cyan-300">
@@ -953,7 +1376,7 @@ function JamRoom({
               </div>
             )}
 
-            {/* TELA */}
+            {/* TRANSMISSÃO */}
 
             <section className="mx-auto max-w-5xl rounded-[26px] border border-white/10 bg-black/20 p-4 md:p-6">
 
@@ -975,8 +1398,7 @@ function JamRoom({
 
                     <span className="font-semibold text-lime-400">
                       {activeScreenTrack
-                        .participant
-                        .name ||
+                        .participant.name ||
                         activeScreenTrack
                           .participant
                           .identity}
@@ -1005,6 +1427,7 @@ function JamRoom({
                   </p>
 
                   <button
+                    type="button"
                     onClick={
                       startScreenShare
                     }
@@ -1056,7 +1479,8 @@ function JamRoom({
                   (participant) => {
                     const isLocal =
                       participant.identity ===
-                      localParticipant.identity;
+                      localParticipant
+                        .identity;
 
                     return (
                       <div
@@ -1115,28 +1539,45 @@ function JamRoom({
 
             <div className="mx-auto mt-6 grid max-w-5xl grid-cols-2 gap-3 md:grid-cols-5">
 
+              {/* MICROFONE / PTT */}
+
               <button
+                type="button"
                 onClick={
                   toggleMicrophone
                 }
-                disabled={!isConnected}
+                disabled={
+                  !isConnected ||
+                  pushToTalk
+                }
                 className={`rounded-2xl border px-5 py-4 font-semibold transition ${
-                  !isConnected
+                  pushToTalk
+                    ? pushToTalkActive
+                      ? "cursor-not-allowed border-lime-400/40 bg-lime-400/10 text-lime-400"
+                      : "cursor-not-allowed border-cyan-400/30 bg-cyan-400/5 text-cyan-400"
+                    : !isConnected
                     ? "cursor-not-allowed border-white/5 text-white/20"
                     : micOn
                     ? "border-green-400/30 text-green-400 hover:bg-green-400/5"
                     : "border-red-400/30 text-red-400 hover:bg-red-400/5"
                 }`}
               >
-                {!isConnected
+                {pushToTalk
+                  ? pushToTalkActive
+                    ? "🎙 FALANDO"
+                    : "🎙 PTT ATIVO"
+                  : !isConnected
                   ? "CONECTANDO"
                   : micOn
                   ? "🎤 MUTE"
                   : "🎤 ATIVAR MIC"}
               </button>
 
+              {/* TELA */}
+
               {!isSharing ? (
                 <button
+                  type="button"
                   onClick={
                     startScreenShare
                   }
@@ -1144,11 +1585,11 @@ function JamRoom({
                     someoneElseSharing ||
                     !isConnected
                   }
-                  className={`rounded-2xl border px-5 py-4 font-semibold transition ${
+                  className={`rounded-2xl border px-5 py-4 font-semibold ${
                     someoneElseSharing ||
                     !isConnected
                       ? "cursor-not-allowed border-white/5 text-white/20"
-                      : "border-cyan-400/30 text-cyan-400 hover:bg-cyan-400/5"
+                      : "border-cyan-400/30 text-cyan-400"
                   }`}
                 >
                   {someoneElseSharing
@@ -1157,6 +1598,7 @@ function JamRoom({
                 </button>
               ) : (
                 <button
+                  type="button"
                   onClick={
                     stopScreenShare
                   }
@@ -1166,9 +1608,14 @@ function JamRoom({
                 </button>
               )}
 
+              {/* SHIIUUU */}
+
               <button
+                type="button"
                 onClick={() =>
-                  setShiuuu(!shiuuu)
+                  setShiuuu(
+                    !shiuuu
+                  )
                 }
                 className={`rounded-2xl border px-5 py-4 font-semibold ${
                   shiuuu
@@ -1182,16 +1629,24 @@ function JamRoom({
                   : "SHIIUUU"}
               </button>
 
+              {/* CONVIDAR */}
+
               <button
+                type="button"
                 onClick={copyInvite}
                 className="rounded-2xl border border-cyan-400/30 px-5 py-4 font-semibold text-cyan-400"
               >
                 🔗 CONVIDAR
               </button>
 
+              {/* CONFIG */}
+
               <button
+                type="button"
                 onClick={() =>
-                  setConfigOpen(true)
+                  setConfigOpen(
+                    true
+                  )
                 }
                 className="rounded-2xl border border-white/10 px-5 py-4 font-semibold text-white/60"
               >
@@ -1200,11 +1655,31 @@ function JamRoom({
 
             </div>
 
+            {/* AVISO PTT */}
+
+            {pushToTalk && (
+              <div className="mx-auto mt-5 max-w-5xl rounded-xl border border-cyan-400/15 bg-cyan-400/[0.03] px-4 py-3 text-center text-sm">
+
+                <span
+                  className={
+                    pushToTalkActive
+                      ? "font-bold text-lime-400"
+                      : "text-white/40"
+                  }
+                >
+                  {pushToTalkActive
+                    ? "🎙 Você está falando"
+                    : "Segure ESPAÇO para falar"}
+                </span>
+
+              </div>
+            )}
+
           </div>
         </div>
       </div>
 
-      {/* CONFIGURAÇÕES */}
+      {/* MODAL CONFIG */}
 
       {configOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-5">
@@ -1224,9 +1699,13 @@ function JamRoom({
               </div>
 
               <button
+                type="button"
                 onClick={() => {
                   stopMicMonitor();
-                  setConfigOpen(false);
+
+                  setConfigOpen(
+                    false
+                  );
                 }}
                 className="text-2xl text-white/40"
               >
@@ -1236,6 +1715,61 @@ function JamRoom({
             </div>
 
             <div className="mt-7 space-y-6">
+
+              {/* PTT */}
+
+              <SettingToggle
+                label="Aperte para Falar"
+                description="Segure a tecla Espaço para abrir seu microfone."
+                value={
+                  pushToTalk
+                }
+                onChange={() => {
+                  togglePushToTalk();
+                }}
+              />
+
+              {pushToTalk && (
+                <div
+                  className={`rounded-2xl border p-4 ${
+                    pushToTalkActive
+                      ? "border-lime-400/30 bg-lime-400/5"
+                      : "border-cyan-400/20 bg-cyan-400/5"
+                  }`}
+                >
+
+                  <div className="flex items-center justify-between gap-4">
+
+                    <div>
+
+                      <p className="font-medium">
+                        Push-to-Talk
+                      </p>
+
+                      <p className="mt-1 text-sm text-white/40">
+                        Segure ESPAÇO enquanto estiver falando.
+                      </p>
+
+                    </div>
+
+                    <span
+                      className={`rounded-lg border px-4 py-2 text-sm font-bold ${
+                        pushToTalkActive
+                          ? "border-lime-400/40 bg-lime-400/10 text-lime-400"
+                          : "border-white/10 text-white/50"
+                      }`}
+                    >
+                      {pushToTalkActive
+                        ? "FALANDO"
+                        : "ESPAÇO"}
+                    </span>
+
+                  </div>
+
+                </div>
+              )}
+
+              {/* NOISE SUPPRESSION */}
 
               <SettingToggle
                 label="Supressão de ruído"
@@ -1248,6 +1782,8 @@ function JamRoom({
                 }
               />
 
+              {/* ECO */}
+
               <SettingToggle
                 label="Cancelamento de eco"
                 description="Útil se estiver usando caixas de som."
@@ -1258,6 +1794,8 @@ function JamRoom({
                   setEchoCancellation
                 }
               />
+
+              {/* AUTO GAIN */}
 
               <SettingToggle
                 label="Ganho automático"
@@ -1277,6 +1815,7 @@ function JamRoom({
                 <div className="flex justify-between gap-4">
 
                   <div>
+
                     <p className="font-medium">
                       Sensibilidade da voz
                     </p>
@@ -1284,6 +1823,7 @@ function JamRoom({
                     <p className="text-sm text-white/40">
                       Ajuste o nível mínimo para detectar sua voz.
                     </p>
+
                   </div>
 
                   <span className="whitespace-nowrap text-cyan-400">
@@ -1314,6 +1854,7 @@ function JamRoom({
                   <span>
                     Mais sensível
                   </span>
+
                   <span>
                     Menos sensível
                   </span>
@@ -1321,13 +1862,14 @@ function JamRoom({
 
               </div>
 
-              {/* MEDIDOR */}
+              {/* TESTE MIC */}
 
               <div className="rounded-2xl border border-white/10 bg-black/20 p-5">
 
                 <div className="flex flex-wrap items-start justify-between gap-3">
 
                   <div>
+
                     <p className="font-medium">
                       Teste do microfone
                     </p>
@@ -1335,6 +1877,7 @@ function JamRoom({
                     <p className="mt-1 text-sm text-white/40">
                       Fale normalmente para ajustar.
                     </p>
+
                   </div>
 
                   <span
@@ -1356,7 +1899,7 @@ function JamRoom({
                 <div className="relative mt-5 h-4 overflow-hidden rounded-full bg-white/10">
 
                   <div
-                    className={`h-full transition-all ${
+                    className={`h-full ${
                       isSpeaking
                         ? "bg-gradient-to-r from-lime-400 to-emerald-400"
                         : "bg-white/20"
@@ -1402,6 +1945,7 @@ function JamRoom({
                 <div className="mt-4 flex gap-3">
 
                   <button
+                    type="button"
                     onClick={
                       startMicMonitor
                     }
@@ -1414,6 +1958,7 @@ function JamRoom({
                   </button>
 
                   <button
+                    type="button"
                     onClick={
                       stopMicMonitor
                     }
@@ -1428,12 +1973,18 @@ function JamRoom({
 
             </div>
 
+            {/* SALVAR */}
+
             <div className="mt-8 flex gap-3">
 
               <button
+                type="button"
                 onClick={() => {
                   stopMicMonitor();
-                  setConfigOpen(false);
+
+                  setConfigOpen(
+                    false
+                  );
                 }}
                 className="flex-1 rounded-xl border border-white/10 px-5 py-4 text-white/50"
               >
@@ -1441,6 +1992,7 @@ function JamRoom({
               </button>
 
               <button
+                type="button"
                 onClick={
                   applyMicrophoneSettings
                 }
@@ -1472,12 +2024,15 @@ function SettingToggle({
   label: string;
   description: string;
   value: boolean;
-  onChange: (value: boolean) => void;
+  onChange: (
+    value: boolean
+  ) => void;
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
 
       <div>
+
         <p className="font-medium">
           {label}
         </p>
@@ -1485,6 +2040,7 @@ function SettingToggle({
         <p className="mt-1 text-sm text-white/40">
           {description}
         </p>
+
       </div>
 
       <button
