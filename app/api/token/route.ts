@@ -6,78 +6,47 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const { roomName, participantName } =
-      await request.json();
+    const { roomName, participantName } = await request.json();
 
     if (!roomName || !participantName) {
       return NextResponse.json(
         {
-          error:
-            "Sala e nome são obrigatórios.",
+          error: "Sala e nome são obrigatórios.",
         },
         { status: 400 }
       );
     }
 
-    const apiKey =
-      process.env.LIVEKIT_API_KEY;
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const serverUrl = process.env.LIVEKIT_URL;
 
-    const apiSecret =
-      process.env.LIVEKIT_API_SECRET;
-
-    const serverUrl =
-      process.env.LIVEKIT_URL;
-
-    if (
-      !apiKey ||
-      !apiSecret ||
-      !serverUrl
-    ) {
+    if (!apiKey || !apiSecret || !serverUrl) {
       return NextResponse.json(
         {
-          error:
-            "LiveKit não configurado.",
+          error: "LiveKit não configurado.",
         },
         { status: 500 }
       );
     }
 
-    /*
-      RoomService usa HTTPS,
-      enquanto nossa variável normalmente
-      está salva como wss://
-    */
+    // RoomService usa HTTPS, enquanto o LiveKit normalmente fornece WSS.
+    const httpUrl = serverUrl
+      .replace(/^wss:/, "https:")
+      .replace(/^ws:/, "http:");
 
-    const httpUrl =
-      serverUrl.replace(
-        /^wss:/,
-        "https:"
-      );
-
-    const roomService =
-      new RoomServiceClient(
-        httpUrl,
-        apiKey,
-        apiSecret
-      );
-
-    /*
-      Verifica quantas pessoas
-      já estão na sala.
-    */
+    const roomService = new RoomServiceClient(
+      httpUrl,
+      apiKey,
+      apiSecret
+    );
 
     let participants = [];
 
     try {
-      participants =
-        await roomService.listParticipants(
-          roomName
-        );
+      participants = await roomService.listParticipants(roomName);
     } catch {
-      /*
-        Se a sala ainda não existe,
-        ela simplesmente está vazia.
-      */
+      // Sala ainda não existe = 0 participantes.
       participants = [];
     }
 
@@ -85,21 +54,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Esta sala já está cheia. Limite de 10 participantes.",
+            "Esta sala está cheia. O limite é de 10 participantes.",
         },
         { status: 403 }
       );
     }
 
-    const token =
-      new AccessToken(
-        apiKey,
-        apiSecret,
-        {
-          identity: `${participantName}-${crypto.randomUUID()}`,
-          name: participantName,
-        }
-      );
+    const token = new AccessToken(apiKey, apiSecret, {
+      identity: `${participantName}-${crypto.randomUUID()}`,
+      name: participantName,
+    });
 
     token.addGrant({
       roomJoin: true,
@@ -113,12 +77,11 @@ export async function POST(request: NextRequest) {
       serverUrl,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Erro ao gerar token:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Erro ao gerar token.",
+        error: "Erro interno ao conectar à sala.",
       },
       { status: 500 }
     );
